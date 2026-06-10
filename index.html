@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Delhivery — Expense Governance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="index.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<div class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+    <div><div class="sb-logo-title">Delhivery</div><div class="sb-logo-sub">Expense Intelligence</div></div>
+  </div>
+  <div class="sb-nav">
+    <div class="sb-section">Navigation</div>
+    <div class="nav-item active" onclick="nav('overview',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="nav-lbl">Overview</span>
+    </div>
+    <div class="nav-item" onclick="nav('risk',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span class="nav-lbl">Anomaly Alert</span>
+      <span class="nav-badge" id="fraud-nav-badge" style="background:#FEE2E2;color:#B91C1C">0</span>
+    </div>
+  </div>
+  <div class="sb-foot">
+    <div class="sb-live-dot"></div>
+    <div class="sb-tag" id="sb-month-tag">April 2026 · Live</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-left">
+      <span class="tb-brand">Delhivery</span>
+      <span class="tb-sep">/</span>
+      <span class="tb-page" id="tb-page">Overview</span>
+    </div>
+    <div class="tb-right">
+      <div class="month-chip" id="month-chip" onclick="toggleMonthDrop(event)">
+        <span id="month-chip-label">April 2026</span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="month-dropdown" id="month-dropdown">
+        <div class="mdd-section">
+          <div class="mdd-label">Select Month</div>
+          <div class="mdd-months" id="mdd-months"></div>
+        </div>
+        <div class="mdd-divider"></div>
+        <div class="mdd-section">
+          <div class="mdd-trend-btn" id="trend-toggle-btn" onclick="toggleTrendView()">📈 Last 5 Months Trend</div>
+        </div>
+      </div>
+      <button class="btn-map" onclick="toggleMap()" id="map-toggle-btn">🗺 View Map</button>
+    </div>
+  </div>
+
+  <!-- ══ OVERVIEW ══ -->
+  <div class="pg active" id="pg-overview">
+    <div class="pg-hd">
+      <div><h1 id="ov-title">Executive Overview</h1><p id="ov-sub">Pan India · 3,301 active centers · FY2026 · <span id="ov-month">April</span></p></div>
+    </div>
+
+    <!-- AOR FILTER -->
+    <div class="aor-bar">
+      <span class="aor-bar-label">🎯 View by AOR</span>
+      <div class="aor-selects">
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Senior Director</span>
+          <select class="aor-sel" id="aor-sd" onchange="onAorChange('sd')"><option value="">— All SDs —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Director</span>
+          <select class="aor-sel" id="aor-dir" onchange="onAorChange('dir')" disabled><option value="">— All Directors —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Senior Manager</span>
+          <select class="aor-sel" id="aor-sm" onchange="onAorChange('sm')" disabled><option value="">— All SMs —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">STM</span>
+          <select class="aor-sel" id="aor-stm" onchange="onAorChange('stm')" disabled><option value="">— All STMs —</option></select>
+        </div>
+      </div>
+      <div class="aor-divider"></div>
+      <button class="aor-clear-btn" onclick="clearAorFilter()">✕ Clear Filter</button>
+    </div>
+
+    <!-- AOR INFO STRIP -->
+    <div class="aor-info-strip" id="aor-info-strip">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="aor-info-role" id="aor-info-role">SD</span>
+          <span class="aor-info-name" id="aor-info-name">—</span>
+        </div>
+        <div class="aor-info-meta" id="aor-info-meta">Showing AOR data only</div>
+        <div class="aor-breadcrumb" id="aor-breadcrumb"></div>
+      </div>
+      <div class="aor-info-kpis" id="aor-info-kpis"></div>
+      <div id="aor-overcap-centers" style="display:none;width:100%">
+        <div style="font-size:12px;font-weight:700;color:#B91C1C;margin-bottom:6px">🔴 Over-Cap Centers — Click to view & download</div>
+        <div class="overcap-center-list" id="overcap-center-list"></div>
+      </div>
+    </div>
+
+    <!-- 5-MONTH TREND BANNER -->
+    <div class="trend-banner" id="trend-banner">
+      <div class="trend-banner-hd">
+        <div><div class="trend-banner-title">📈 5-Month Pan India Trend · Jan 2026 – May 2026</div><div class="trend-banner-sub">Total approved spend across all centers</div></div>
+        <button class="trend-close" onclick="selectGovernanceMonth(currentMonth)">✕ Close</button>
+      </div>
+      <canvas id="trend6Chart" style="max-height:160px"></canvas>
+    </div>
+
+    <!-- MAP -->
+    <div class="map-panel" id="map-panel">
+      <div class="map-panel-inner">
+        <div class="map-panel-hd">
+          <span style="font-size:14px;font-weight:700">Center Overspend Map · Top 30 Centers</span>
+          <div class="mleg">
+            <div class="mi"><div class="md" style="background:#E8341C"></div>&gt;₹1Cr</div>
+            <div class="mi"><div class="md" style="background:#DC2626"></div>₹50L–₹1Cr</div>
+            <div class="mi"><div class="md" style="background:#D97706"></div>₹10L–₹50L</div>
+            <button onclick="toggleMap()" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:4px 12px;font-size:11px;cursor:pointer;color:var(--t2);">✕ Close</button>
+          </div>
+        </div>
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi" onclick="scrollToElement('unifiedChart')">
+        <div class="kpi-accent" style="background:linear-gradient(90deg,#2563EB,#3B82F6)"></div>
+        <div class="kpi-lbl">Approved Spend</div>
+        <div class="kpi-val b" id="kpi-spend">₹0</div>
+        <div class="kpi-meta" id="kpi-spend-meta">Live data loading...</div>
+      </div>
+      <div class="kpi" onclick="scrollToElement('hier-month-view')">
+        <div class="kpi-accent" style="background:linear-gradient(90deg,#E8341C,#DC2626)"></div>
+        <div class="kpi-lbl">Total Overspend</div>
+        <div class="kpi-val r" id="kpi-over">₹0</div>
+        <div class="kpi-meta">Spend above benchmark caps</div>
+      </div>
+      <div class="kpi" onclick="scrollToElement('hier-month-view')">
+        <div class="kpi-accent" style="background:linear-gradient(90deg,#16A34A,#22C55E)"></div>
+        <div class="kpi-lbl">Within Cap</div>
+        <div class="kpi-val g" id="kpi-cap">₹0</div>
+        <div class="kpi-meta">Compliant portion of spend</div>
+      </div>
+      <div class="kpi" style="cursor:default;">
+        <div class="kpi-accent" style="background:linear-gradient(90deg,#B91C1C,#E8341C)"></div>
+        <div class="kpi-lbl">Centers Over Cap</div>
+        <div class="kpi-val r" id="kpi-centers">0</div>
+        <div class="kpi-meta" id="kpi-centers-meta">0% of total centers</div>
+      </div>
+    </div>
+
+    <!-- MERGED CHART -->
+    <div class="chart-unified">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div>
+          <div style="font-size:15px;font-weight:700" id="unified-chart-title">Expense Analytics</div>
+          <div style="font-size:11.5px;color:var(--t3);margin-top:2px" id="unified-chart-sub">Top 6 categories · Stacked monthly view · Jan–May 2026</div>
+        </div>
+      </div>
+      <!-- Category filter pills -->
+      <div id="cat-filter-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+      <div class="chart-canvas-wrap">
+        <canvas id="unifiedChart" style="max-height:280px"></canvas>
+      </div>
+    </div>
+
+    <!-- CATEGORY QUICK VIEW -->
+    <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:700">Category Spend · Quick View</span>
+      <span style="font-size:11.5px;color:var(--t3)">Click a category to highlight in chart above</span>
+    </div>
+    <div class="cat-overview-grid" id="cat-ov-grid"></div>
+    
+    <!-- Category trend panel -->
+    <div id="cat-trend-panel" style="display:none;background:#fff;border:1.5px solid #FECACA;border-radius:13px;padding:18px 20px;margin-top:10px;margin-bottom:6px;box-shadow:var(--sh);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:14px;font-weight:700" id="cat-trend-title">Category Trend</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">Monthly spend · Jan–May 2026</div>
+        </div>
+        <button onclick="closeCatTrend()" style="background:#F5F6FA;border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:11.5px;cursor:pointer;font-family:var(--font);color:var(--t2)">✕ Close</button>
+      </div>
+      <canvas id="cat-trend-chart" style="max-height:200px"></canvas>
+    </div>
+
+    <div style="margin:22px 0 10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <span style="font-size:14px;font-weight:700">Senior Director Ranking</span>
+        <span id="sd-ranking-badge" style="font-size:11px;background:#EFF6FF;color:#1D4ED8;padding:2px 10px;border-radius:10px;font-weight:700;margin-left:8px;font-family:var(--mono)">5-Month Trend · Jan–May</span>
+      </div>
+      <span style="font-size:11.5px;color:var(--t3)">Click SD row to expand · SD → Director → SM → STM → Center</span>
+    </div>
+
+    <div id="hier-trend-view">
+      <div class="hier-wrap">
+        <div class="hier-head">
+          <h2>SD Ranking · 5-Month Trend · Jan 2026 – May 2026 · Click SD to expand Directors</h2>
+          <span>Sorted by 5-month total · Click to drill down</span>
+        </div>
+        <div class="col-hd-trend"><div>Rank</div><div>Senior Director</div><div>Jan</div><div>Feb</div><div>Mar</div><div>Apr</div><div>May</div><div>Trend</div></div>
+        <div id="hier-trend-body"></div>
+      </div>
+    </div>
+    
+    <div id="hier-month-view" style="display:none">
+      <div class="hier-wrap">
+        <div class="hier-head">
+          <h2 id="hier-month-head">SD → Director → SM → STM → Center</h2>
+          <span id="hier-month-subhead">Sorted by overspend · Centers in red = over cap</span>
+        </div>
+        <div class="col-hd"><div></div><div>Name / Level</div><div>Total Spend</div><div>Overspend</div><div>Centers</div><div>Over-Cap Centers</div><div>Risk</div></div>
+        <div id="hier-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RISK & FRAUD INTELLIGENCE ══ -->
+  <div class="pg" id="pg-risk">
+    <div class="pg-hd">
+      <div>
+        <h1>🛡 Anomaly Alert</h1>
+        <p>Fraud signal detection · Overspend analysis · <span id="ano-month">April 2026</span></p>
+      </div>
+    </div>
+
+    <!-- 2 KPIs -->
+    <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px;">
+      <div class="kpi kpi-clickable" onclick="toggleKpiCentersPanel('critical')" title="Click to see critical centers">
+        <div class="kpi-accent" style="background:linear-gradient(90deg,#7F1D1D,#B91C1C)"></div>
+        <div class="kpi-lbl">Critical Risk Centers <span style="font-size:9px;color:var(--red)">↗ Click</span></div>
+        <div class="kpi-val r" id="kpi-critical-risk-count">0</div>
+        <div class="kpi-meta">Fraud score &gt;40 · Immediate action needed</div>
+      </div>
+      <div class="kpi kpi-clickable" onclick="toggleKpiCentersPanel('high')" title="Click to see high risk centers">
+        <div class="kpi-accent" style="background:linear-gradient(90deg,#D97706,#F59E0B)"></div>
+        <div class="kpi-lbl">High Risk Centers <span style="font-size:9px;color:var(--amber)">↗ Click</span></div>
+        <div class="kpi-val a" id="kpi-high-risk-count">0</div>
+        <div class="kpi-meta">Needs immediate review · Click to view all</div>
+      </div>
+    </div>
+
+    <!-- KPI CENTERS PANEL -->
+    <div class="kpi-centers-panel" id="kpi-centers-panel-ano">
+      <div class="kcp-hd">
+        <h3 id="kcp-ano-title">Centers — Click for full analysis & download</h3>
+        <button class="kcp-close" onclick="document.getElementById('kpi-centers-panel-ano').classList.remove('on')">✕ Close</button>
+      </div>
+      <div class="kcp-grid" id="kcp-ano-grid"></div>
+    </div>
+
+    <!-- SIGNAL LEGEND -->
+    <div style="background:linear-gradient(135deg,#1E293B,#334155);border-radius:13px;padding:14px 20px;margin-bottom:16px;color:#fff">
+      <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.8px">🔍 Fraud Signal Guide</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span>⚡</span><span style="color:rgba(255,255,255,.8)"><strong style="color:#fff">Electricity &gt;50×</strong> — meter tampering / unit inflation</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span>👤</span><span style="color:rgba(255,255,255,.8)"><strong style="color:#fff">Staff Welfare &gt;100×</strong> — ghost mandays / fake headcount</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span>💧</span><span style="color:rgba(255,255,255,.8)"><strong style="color:#fff">Water cash</strong> — no can-count → phantom purchases</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span>📌</span><span style="color:rgba(255,255,255,.8)"><strong style="color:#fff">Single-month spike</strong> — bulk/backlog fabrication</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span>🚨</span><span style="color:rgba(255,255,255,.8)"><strong style="color:#fff">Multi-category ≥5</strong> — systemic manipulation</span></div>
+      </div>
+    </div>
+
+    <!-- FILTERS + SEARCH -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div class="fraud-filter-bar" style="margin-bottom:0">
+        <span style="font-size:12px;font-weight:700;color:var(--t2)">Filter:</span>
+        <button class="fraud-filter-btn active" onclick="filterFraud('all',this)">All</button>
+        <button class="fraud-filter-btn" onclick="filterFraud('electricity',this)">⚡ Electricity</button>
+        <button class="fraud-filter-btn" onclick="filterFraud('welfare',this)">👤 Staff Welfare</button>
+        <button class="fraud-filter-btn" onclick="filterFraud('water',this)">💧 Water</button>
+        <button class="fraud-filter-btn" onclick="filterFraud('multi',this)">🚨 Multi-Cat</button>
+      </div>
+      <input id="fraud-search" placeholder="Search center or SD…" oninput="filterFraudSearch(this.value)"
+        style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:12.5px;outline:none;width:220px"/>
+    </div>
+
+    <!-- FRAUD CARDS GRID -->
+    <div class="fraud-grid" id="fraud-grid"></div>
+
+    <!-- OVERSPEND TABLE (collapsible) -->
+    <div class="drop-section" style="margin-top:4px">
+      <div class="drop-hd" onclick="toggleDrop('centers-drop',this)">
+        <div class="drop-hd-left">
+          <div class="drop-hd-icon r">🏭</div>
+          <div><div class="drop-hd-title">Full Overspend Centers List</div><div class="drop-hd-sub">All centers · sorted by overspend · click for full analysis</div></div>
+        </div>
+        <div class="drop-hd-right"><span class="ovr-tag" id="overspend-total-badge">₹0 total</span><span class="drop-arrow">▼</span></div>
+      </div>
+      <div class="drop-body" id="centers-drop">
+        <div style="margin-bottom:12px"><input id="csearch" placeholder="Search center, SD, SM…" oninput="filterCenters(this.value)" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:12.5px;outline:none;width:100%;max-width:400px"/></div>
+        <div class="tbl-wrap" style="margin-bottom:0">
+          <table><thead><tr><th>#</th><th>Center</th><th>SD</th><th>SM</th><th>Total Spend</th><th>Overspend</th><th>Fraud Score</th><th>Risk</th></tr></thead><tbody id="centers-table"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-hd">
+      <div><h2 id="modal-title">Center</h2><div class="modal-meta" id="modal-meta"></div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="modal-dl-btn" onclick="downloadCenterData()">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download CSV
+        </button>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-kpis" id="modal-kpis" style="grid-template-columns:1fr 1fr;max-width:480px"></div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-hd">
+          <div>
+            <div class="card-title" id="modal-chart-title">Month vs Expense · Over-Cap Categories</div>
+            <div class="card-sub" id="modal-chart-sub">Monthly spend for categories exceeding benchmark cap · Dashed line = cap threshold</div>
+          </div>
+        </div>
+        <canvas id="modal-monthly" style="max-height:280px"></canvas>
+      </div>
+      <div style="margin-top:20px;">
+        <h4 style="font-size:13px; font-weight:700; margin-bottom:10px;">Category Details</h4>
+        <div class="cat-cards" id="modal-cat-cards-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── BOOTSTRAP DATA & LOGIC ── -->
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
