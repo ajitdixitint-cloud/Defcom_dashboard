@@ -1628,7 +1628,6 @@ function renderCentersTable() {
   }
 
   // Pre-calculate risk scores once to avoid nested O(N*M*K) layout freezes
-  const rScores = computeFraudRiskScores();
 
   filtered.forEach((c, idx) => {
     const hc = D.allCenters.find(ac => ac["HQ Name"] === c.name) || { SD: "Unknown", D: "Unknown", SM: "Unknown" };
