@@ -122,28 +122,24 @@ if (typeof D === "undefined" || D === null || !D.center_details) {
   }
 }
 
-// ── GLOBAL APPLICATION STATE ──
-let filteredData = null;
-let currentMonth = 5; // Default to May 2026
-let isHistoricalMode = false;
-let activeHistMonthKey = null;
-let activePage = "overview";
+// ══ STATE ══
 let showMap = false;
-
-// Global AOR selection filters
-let selectedAor = { sd: "", d: "", sm: "", stm: "" };
-
+let activePage = "overview";
+let currentMonth = 5; // Default to May 2026 (Live month 5)
+let isHistoricalMode = false;
+let activeHistMonthKey = null; // "jan", "feb", etc.
 // Chart & Map Instance management
-let unifiedChart = null;
+let unifiedChartInstance = null;
 let categoryTrendChart = null;
-let modalMonthlyChart = null;
 let leafletMap = null;
 let leafletMarkersGroup = null;
 let activeCategoryFilter = "all";
-let activeFraudFilter = "all";
+let activeFraudFilters = new Set(['all']);
 let fraudSearchQuery = "";
 let centersSearchQuery = "";
 let activeModalCenterName = null;
+let selectedAor = { sd: "", d: "", sm: "", stm: "" };
+let selectedRiskAor = { sd: "", d: "", sm: "", stm: "", center: "" };
 
 const CHART_COLORS = {
   red: "#E8341C",
@@ -171,6 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Populate AOR Selects
   populateAorSelects();
+  populateRiskAorSelects();
 
   // Load and apply data build
   refreshDashboard();
@@ -614,14 +611,14 @@ function updateLeafletMap() {
   leafletMarkersGroup.clearLayers();
   const bounds = [];
 
-  D.deviations.forEach(dev => {
-    const name = dev.HQ;
+  for (const name in filteredData.centerDetails) {
     const center = filteredData.centerDetails[name];
-    if (!center) return;
+    const hc = D.allCenters.find(ac => ac["HQ Name"] === name);
+    if (!hc) continue;
 
-    const lat = parseFloat(dev.Latitude);
-    const lng = parseFloat(dev.Longitude);
-    if (isNaN(lat) || isNaN(lng)) return;
+    const lat = parseFloat(hc.Latitude);
+    const lng = parseFloat(hc.Longitude);
+    if (isNaN(lat) || isNaN(lng)) continue;
 
     let markerColor = CHART_COLORS.green;
     let radius = 6;
@@ -648,7 +645,7 @@ function updateLeafletMap() {
     marker.bindPopup(popupHtml);
     marker.addTo(leafletMarkersGroup);
     bounds.push([lat, lng]);
-  });
+  }
 
   if (bounds.length > 0 && selectedAor.sd) {
     leafletMap.fitBounds(bounds, { padding: [40, 40] });
@@ -1161,6 +1158,103 @@ function clearAorFilter() {
   onAorChange("sd");
 }
 
+// ── ANOMALY AOR SELECT DROPDOWN LOGIC ──
+function populateRiskAorSelects() {
+  const sdSelect = document.getElementById("risk-sd");
+  if (!sdSelect) return;
+  const sds = [...new Set(D.allCenters.map(c => c.SD))].filter(Boolean);
+  sdSelect.innerHTML = `<option value="">— All SDs —</option>`;
+  sds.forEach(sd => sdSelect.innerHTML += `<option value="${sd}">${sd}</option>`);
+}
+
+function onRiskAorChange(level) {
+  const sdVal = document.getElementById("risk-sd").value;
+  const dSelect = document.getElementById("risk-dir");
+  const smSelect = document.getElementById("risk-sm");
+  const stmSelect = document.getElementById("risk-stm");
+  const cSelect = document.getElementById("risk-center");
+
+  if (level === "sd") {
+    selectedRiskAor.sd = sdVal; selectedRiskAor.d = ""; selectedRiskAor.sm = ""; selectedRiskAor.stm = ""; selectedRiskAor.center = "";
+    dSelect.value = ""; smSelect.value = ""; stmSelect.value = ""; cSelect.value = "";
+    
+    if (sdVal) {
+      dSelect.disabled = false;
+      const divs = [...new Set(D.allCenters.filter(c => c.SD === sdVal).map(c => c.D))].filter(Boolean);
+      dSelect.innerHTML = `<option value="">— All Directors —</option>`;
+      divs.forEach(d => dSelect.innerHTML += `<option value="${d}">${d}</option>`);
+      
+      smSelect.innerHTML = `<option value="">— All SMs —</option>`; smSelect.disabled = true;
+      stmSelect.innerHTML = `<option value="">— All STMs —</option>`; stmSelect.disabled = true;
+      cSelect.innerHTML = `<option value="">— All Centers —</option>`; cSelect.disabled = true;
+    } else {
+      dSelect.disabled = true; dSelect.innerHTML = `<option value="">— All Directors —</option>`;
+      smSelect.disabled = true; smSelect.innerHTML = `<option value="">— All SMs —</option>`;
+      stmSelect.disabled = true; stmSelect.innerHTML = `<option value="">— All STMs —</option>`;
+      cSelect.disabled = true; cSelect.innerHTML = `<option value="">— All Centers —</option>`;
+    }
+  } else if (level === "dir") {
+    const dVal = dSelect.value;
+    selectedRiskAor.d = dVal; selectedRiskAor.sm = ""; selectedRiskAor.stm = ""; selectedRiskAor.center = "";
+    smSelect.value = ""; stmSelect.value = ""; cSelect.value = "";
+    
+    if (dVal) {
+      smSelect.disabled = false;
+      const sms = [...new Set(D.allCenters.filter(c => c.D === dVal).map(c => c.SM))].filter(Boolean);
+      smSelect.innerHTML = `<option value="">— All SMs —</option>`;
+      sms.forEach(sm => smSelect.innerHTML += `<option value="${sm}">${sm}</option>`);
+      
+      stmSelect.innerHTML = `<option value="">— All STMs —</option>`; stmSelect.disabled = true;
+      cSelect.innerHTML = `<option value="">— All Centers —</option>`; cSelect.disabled = true;
+    } else {
+      smSelect.disabled = true; smSelect.innerHTML = `<option value="">— All SMs —</option>`;
+      stmSelect.disabled = true; stmSelect.innerHTML = `<option value="">— All STMs —</option>`;
+      cSelect.disabled = true; cSelect.innerHTML = `<option value="">— All Centers —</option>`;
+    }
+  } else if (level === "sm") {
+    const smVal = smSelect.value;
+    selectedRiskAor.sm = smVal; selectedRiskAor.stm = ""; selectedRiskAor.center = "";
+    stmSelect.value = ""; cSelect.value = "";
+    
+    if (smVal) {
+      stmSelect.disabled = false;
+      const stms = [...new Set(D.allCenters.filter(c => c.SM === smVal).map(c => c.STM))].filter(Boolean);
+      stmSelect.innerHTML = `<option value="">— All STMs —</option>`;
+      stms.forEach(stm => stmSelect.innerHTML += `<option value="${stm}">${stm}</option>`);
+      
+      cSelect.innerHTML = `<option value="">— All Centers —</option>`; cSelect.disabled = true;
+    } else {
+      stmSelect.disabled = true; stmSelect.innerHTML = `<option value="">— All STMs —</option>`;
+      cSelect.disabled = true; cSelect.innerHTML = `<option value="">— All Centers —</option>`;
+    }
+  } else if (level === "stm") {
+    const stmVal = stmSelect.value;
+    selectedRiskAor.stm = stmVal; selectedRiskAor.center = "";
+    cSelect.value = "";
+    
+    if (stmVal) {
+      cSelect.disabled = false;
+      const cens = [...new Set(D.allCenters.filter(c => c.STM === stmVal).map(c => c["HQ Name"]))].filter(Boolean);
+      cSelect.innerHTML = `<option value="">— All Centers —</option>`;
+      cens.forEach(c => cSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    } else {
+      cSelect.disabled = true; cSelect.innerHTML = `<option value="">— All Centers —</option>`;
+    }
+  } else if (level === "center") {
+    selectedRiskAor.center = cSelect.value;
+  }
+  
+  renderFraudSection();
+}
+
+function clearRiskAorFilter() {
+  const sd = document.getElementById("risk-sd");
+  if (sd) {
+    sd.value = "";
+    onRiskAorChange("sd");
+  }
+}
+
 // ── ANOMALY DETECTIONS & FRAUD SECTION ──
 function computeFraudRiskScores() {
   const riskScores = [];
@@ -1266,23 +1360,59 @@ function renderFraudSection() {
 
   const riskScores = computeFraudRiskScores();
   
-  // Filter by risk tabs
-  let list = riskScores;
-  if (activeFraudFilter === "critical") list = riskScores.filter(r => r.score >= 60);
-  else if (activeFraudFilter === "high") list = riskScores.filter(r => r.score >= 40 && r.score < 60);
-  else if (activeFraudFilter === "medium") list = riskScores.filter(r => r.score >= 20 && r.score < 40);
+  // 1. Filter by Hierarchical AOR
+  let hierarchyFiltered = riskScores;
+  if (selectedRiskAor.sd) {
+    hierarchyFiltered = hierarchyFiltered.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.SD === selectedRiskAor.sd;
+    });
+  }
+  if (selectedRiskAor.d) {
+    hierarchyFiltered = hierarchyFiltered.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.D === selectedRiskAor.d;
+    });
+  }
+  if (selectedRiskAor.sm) {
+    hierarchyFiltered = hierarchyFiltered.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.SM === selectedRiskAor.sm;
+    });
+  }
+  if (selectedRiskAor.stm) {
+    hierarchyFiltered = hierarchyFiltered.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.STM === selectedRiskAor.stm;
+    });
+  }
+  if (selectedRiskAor.center) {
+    hierarchyFiltered = hierarchyFiltered.filter(r => r.name === selectedRiskAor.center);
+  }
+
+  // Update Badge Counts based on hierarchy filtered list
+  const criticalCount = hierarchyFiltered.filter(r => r.score >= 60).length;
+  const highCount = hierarchyFiltered.filter(r => r.score >= 40 && r.score < 60).length;
+  document.getElementById("kpi-critical-risk-count").innerText = criticalCount;
+  document.getElementById("kpi-high-risk-count").innerText = highCount;
+
+  if (countBadge) {
+    countBadge.innerText = criticalCount + highCount;
+  }
+
+  // 2. Filter by category multi-select (merged categories)
+  let list = hierarchyFiltered;
+  if (!activeFraudFilters.has("all")) {
+    list = list.filter(r => {
+      return r.triggers.some(t => activeFraudFilters.has(t.type));
+    });
+  }
 
   // Search filter
   if (fraudSearchQuery) {
     const q = fraudSearchQuery.toLowerCase();
     list = list.filter(r => r.name.toLowerCase().includes(q));
   }
-
-  // Update Badge Counts
-  const criticalCount = riskScores.filter(r => r.score >= 60).length;
-  const highCount = riskScores.filter(r => r.score >= 40 && r.score < 60).length;
-  document.getElementById("kpi-critical-risk-count").innerText = criticalCount;
-  document.getElementById("kpi-high-risk-count").innerText = highCount;
 
   if (list.length === 0) {
     grid.innerHTML = `<div style="grid-column: span 3; text-align:center; padding:32px; color:var(--t3);">No risk alerts detected in this category.</div>`;
@@ -1324,10 +1454,30 @@ function renderFraudSection() {
   renderCentersTable();
 }
 
-function filterFraud(level, btn) {
-  activeFraudFilter = level;
-  document.querySelectorAll(".fraud-filter-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
+function filterFraud(category, btn) {
+  if (category === "all") {
+    activeFraudFilters.clear();
+    activeFraudFilters.add("all");
+    document.querySelectorAll(".fraud-filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  } else {
+    activeFraudFilters.delete("all");
+    const allBtn = document.querySelector(".fraud-filter-btn[onclick*=\"'all'\"]");
+    if (allBtn) allBtn.classList.remove("active");
+
+    if (activeFraudFilters.has(category)) {
+      activeFraudFilters.delete(category);
+      btn.classList.remove("active");
+    } else {
+      activeFraudFilters.add(category);
+      btn.classList.add("active");
+    }
+
+    if (activeFraudFilters.size === 0) {
+      activeFraudFilters.add("all");
+      if (allBtn) allBtn.classList.add("active");
+    }
+  }
   renderFraudSection();
 }
 
@@ -1352,6 +1502,35 @@ function toggleKpiCentersPanel(level) {
   } else {
     list = riskScores.filter(r => r.score >= 40 && r.score < 60);
     title.innerText = "🟡 High Risk Centers — Needs immediate invoice review";
+  }
+
+  // Filter by Risk AOR Hierarchy
+  if (selectedRiskAor.sd) {
+    list = list.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.SD === selectedRiskAor.sd;
+    });
+  }
+  if (selectedRiskAor.d) {
+    list = list.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.D === selectedRiskAor.d;
+    });
+  }
+  if (selectedRiskAor.sm) {
+    list = list.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.SM === selectedRiskAor.sm;
+    });
+  }
+  if (selectedRiskAor.stm) {
+    list = list.filter(r => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === r.name);
+      return hc && hc.STM === selectedRiskAor.stm;
+    });
+  }
+  if (selectedRiskAor.center) {
+    list = list.filter(r => r.name === selectedRiskAor.center);
   }
 
   if (list.length === 0) {
@@ -1390,15 +1569,56 @@ function renderCentersTable() {
   list.sort((a,b) => b.over - a.over);
 
   let filtered = list;
+
+  // Filter by Risk AOR Hierarchy
+  if (selectedRiskAor.sd) {
+    filtered = filtered.filter(c => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === c.name);
+      return hc && hc.SD === selectedRiskAor.sd;
+    });
+  }
+  if (selectedRiskAor.d) {
+    filtered = filtered.filter(c => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === c.name);
+      return hc && hc.D === selectedRiskAor.d;
+    });
+  }
+  if (selectedRiskAor.sm) {
+    filtered = filtered.filter(c => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === c.name);
+      return hc && hc.SM === selectedRiskAor.sm;
+    });
+  }
+  if (selectedRiskAor.stm) {
+    filtered = filtered.filter(c => {
+      const hc = D.allCenters.find(ac => ac["HQ Name"] === c.name);
+      return hc && hc.STM === selectedRiskAor.stm;
+    });
+  }
+  if (selectedRiskAor.center) {
+    filtered = filtered.filter(c => c.name === selectedRiskAor.center);
+  }
+
+  // Filter by category multi-select (merged categories)
+  const rScores = computeFraudRiskScores();
+  if (!activeFraudFilters.has("all")) {
+    filtered = filtered.filter(c => {
+      const risk = rScores.find(r => r.name === c.name);
+      return risk && risk.triggers.some(t => activeFraudFilters.has(t.type));
+    });
+  }
+
+  // Search filter
   if (centersSearchQuery) {
     const q = centersSearchQuery.toLowerCase();
-    filtered = list.filter(c => {
+    filtered = filtered.filter(c => {
       const hc = D.allCenters.find(ac => ac["HQ Name"] === c.name) || { SD: "", SM: "" };
       return c.name.toLowerCase().includes(q) || hc.SD.toLowerCase().includes(q) || hc.SM.toLowerCase().includes(q);
     });
   }
 
-  document.getElementById("overspend-total-badge").innerText = `${formatCurrency(filteredData.totalOverspend)} total`;
+  const totalOverFiltered = filtered.reduce((acc, c) => acc + c.over, 0);
+  document.getElementById("overspend-total-badge").innerText = `${formatCurrency(totalOverFiltered)} total`;
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--t3);">No centers found.</td></tr>`;

@@ -273,6 +273,35 @@
       </div>
     </div>
 
+    <!-- HIERARCHICAL FILTERS -->
+    <div class="aor-bar" style="margin-bottom:20px">
+      <span class="aor-bar-label">🎯 Filter by Hierarchy</span>
+      <div class="aor-selects">
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Senior Director</span>
+          <select class="aor-sel" id="risk-sd" onchange="onRiskAorChange('sd')"><option value="">— All SDs —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Director</span>
+          <select class="aor-sel" id="risk-dir" onchange="onRiskAorChange('dir')" disabled><option value="">— All Directors —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Senior Manager</span>
+          <select class="aor-sel" id="risk-sm" onchange="onRiskAorChange('sm')" disabled><option value="">— All SMs —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">STM</span>
+          <select class="aor-sel" id="risk-stm" onchange="onRiskAorChange('stm')" disabled><option value="">— All STMs —</option></select>
+        </div>
+        <div class="aor-select-wrap">
+          <span class="aor-select-lbl">Center</span>
+          <select class="aor-sel" id="risk-center" onchange="onRiskAorChange('center')" disabled><option value="">— All Centers —</option></select>
+        </div>
+      </div>
+      <div class="aor-divider"></div>
+      <button class="aor-clear-btn" onclick="clearRiskAorFilter()">✕ Clear</button>
+    </div>
+
     <!-- FILTERS + SEARCH -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
       <div class="fraud-filter-bar" style="margin-bottom:0">
