@@ -128,9 +128,11 @@ let activePage = "overview";
 let currentMonth = 5; // Default to May 2026 (Live month 5)
 let isHistoricalMode = false;
 let activeHistMonthKey = null; // "jan", "feb", etc.
+let filteredData = {}; // Stores computed dashboard totals
 // Chart & Map Instance management
-let unifiedChartInstance = null;
+let unifiedChart = null;
 let categoryTrendChart = null;
+let modalMonthlyChart = null;
 let leafletMap = null;
 let leafletMarkersGroup = null;
 let activeCategoryFilter = "all";
